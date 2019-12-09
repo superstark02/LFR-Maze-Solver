@@ -1,177 +1,397 @@
 #include <QTRSensors.h>
-#define NUM_SENSORS 8
-#define TIMEOUT 2500 //microseconds
+#include <Encoder.h>
 
-QTRSensorsRC my_sensor(() {, , , , , , , },
-  NUM_SENSORS, TIMEOUT, );
+#define Kp 0 // experiment to determine this, start by something small that just makes your bot follow the line at a slow speed
+#define Kd 0 // experiment to determine this, slowly increase the speeds and adjust this value. ( Note: Kp < Kd) 
+#define rightMaxSpeed 200 // max speed of the robot
+#define leftMaxSpeed 200 // max speed of the robot
+#define rightBaseSpeed 150 // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define leftBaseSpeed 150  // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define NUM_SENSORS  8     // number of sensors used
+#define TIMEOUT       2500  // waits for 2500 us for sensor outputs to go low
+#define EMITTER_PIN   2     // emitter is controlled by digital pin 2
+#define IR_TOP_PIN 
+#define IR_LEFT_PIN 
+#define IR_RIGHT_PIN 
+#define rightMotor1 3
+#define rightMotor2 4
+#define rightMotorPWM 5
+#define leftMotor1 12
+#define leftMotor2 13
+#define leftMotorPWM 11
+#define motorPower 8
 
+struct maze{
 
-typedef struct{
-    int x,y,point,type,explored;
-}maze;
-maze track[10];
+    char point;
+    byte type;
+    byte explored;
+    byte x_cordinate;
+    byte y_cordinate;
 
-bool start = false;
-int node = 0;
-int current_x = 0; 
-int current_y = 0;
-int j = 0; 
-int visited[j];
-int visit_length = visit.length()/4;
+}points[15];
+
+points[0].point='A';
+points[0].type=0;
+points[0].explored=1;
+points[0].x_cordinate=0;
+points[0].y_cordinate=0;
+
+byte len=1;
+
+Encoder myEnc(5, 6);
+
+QTRSensorsRC qtrrc((unsigned char[]) {
+
+  A0, A1, A2, A3, A4, A5, A6, A7
+
+} , NUM_SENSORS, TIMEOUT, EMITTER_PIN); // sensor connected through analog pins A0 - A7 i.e. digital pins 14-19 in uno
+
+unsigned int sensorValues[NUM_SENSORS];
 
 void setup()
-{
-    for (int i = 0; i < 400; i++)  // make the calibration 
-  {
-    qtrrc.calibrate();       
-    digitalWrite(LED_BUILTIN, HIGH);     
-  }
 
-    digitalWrite(LED_BUILTIN,LOW);
+{
+  pinMode(rightMotor1, OUTPUT);
+  pinMode(rightMotor2, OUTPUT);
+  pinMode(rightMotorPWM, OUTPUT);
+  pinMode(leftMotor1, OUTPUT);
+  pinMode(leftMotor2, OUTPUT);
+  pinMode(leftMotorPWM, OUTPUT);
+  pinMode(motorPower, OUTPUT);
+
+  byte i;
+
+  for (i = 0; i < 100; i++)
+    qtrrc.calibrate();
+    delay(20);
+
+    wait();
+  delay(2000); 
 }
 
-void loop()
-{
-    //when started
+byte previous_x=0;
+byte previous_y=0;
+byte temp_x=0;
+byte temp_y=0;
+bool angle;             //1 means 90 and 0 means 135
 
-    if(start==false && /*straiht line*/){
-        track[node].x = 0; track[node].y = 0; track[node].type = 0; track[node].explored = 1; track[node].point = 0;
-        start = true;
-        digitalWrite(LED_BUILTIN,HIGH);
-        //move_forward();
-    }
+char dir='S';
+int encoder_start=myEnc.read();
+int encoder_stop;
+int lastError = 0;
 
-    if(/*any junction*/)
-    {
-         current_x = current_x + encoder_x_distance; current_y = current_y + encoder_y_distance;
+void loop(){
 
-                    if(search(current_x,current_y)==false)
-                    {
-                        node++;
-                        track[node].x = current_x + encoder_x_distance; track[node].y = current_y + encoder_y_distance;
-                        track[node].explored = 1; track[node].point = node;
+    unsigned int sensors[8];
+    int position = qtrrc.readLine(sensors,QTR_EMITTERS_ON,1); // get calibrated readings along with the line position, refer to the QTR Sensors Arduino Library for more details on line position.
+    int error = position - 3500;
+    bool IR_TOP = digiatlread(IR_TOP_PIN);
+    bool IR_LEFT = digiatlread(IR_LEFT_PIN);
+    bool IR_RIGHT = digiatlread(IR_RIGHT_PIN);
 
-                         switch(/*type of juction*/)
-                         {
-                            case : /*right point*/
-                                track[node].type = 1;
-                                //move right
-                                break;
-                            
-                            case : /*left turn*/
-                                track[node].type = 1;
-                                //move left
-                                break;
+    if(IR_LEFT==1 && IR_RIGHT==1 && IR_TOP==1) {             //90 deg cross
 
-                            case : /*T point*/
-                                track[node].type = 2;
-                                //turn right
-                                break;
+        encoder_stop=myEnc.read();
 
-                            case : /*+ point*/
-                                track[node].type = 3;
-                                //turn right
-                                break;
-                         }
-                    }
-                    else
-                    {
-                        track[node].explored++ ;
+        assign_temp_point();
 
-                        switch (track[node].explored)
-                        {
-                        case 2:
-                            /*move forward*/
-                            break;
-                        case 3:
-                            /*move left*/
-                            break;
-                        }
+        if(check()){
+            points[len].x_cordinate=temp_x;
+            points[len].y_cordinate=temp_y;
+            points[len].type=2;
+            points[len].point='A'+len;
+            points[len].explored=1;
 
-                        if(track[node].explored == track[node].type)
-                        {
-                            //about turn.
-                        }
-                        else if(track[node].explored > track[node].type)
-                        {
-                            actual_run();
-                        }
-                    }
+            len++;
 
-                    visited[j] = node;
-                    j++;
-    }
-}
-
-int search(int x, int y, int node) 
-{ 
-    int i; 
-    for (i = 0; i <= node; i++) {
-        if (track[i].x == current_x && track[i].y == current_y) 
-            return true; 
-
-    }
-    return false; 
-} 
-
-void PIDcontrol(){ 
-  int error = position - 1000;  
-
-  int motorSpeed= Kp*error + Kd*(Error-lastError);
-
-  leftMotor = initialSpeed+motorSpeed;
-  rightMotor = initalSpeed-motorSpeed;
-
-  lastError = error;
-
-  if(rightMotor<0)
-    rightMotor = 0;
-
-  if(leftMotor<0)
-    leftMotor = o;  
-}
-
-void actual_run()
-{
-    unsigned int graph[node][node];
-
-    for(int i = 0; i<node ; i++)
-    {
-        for(int k = 0; k<node ; k++) //forming adjacency matrix
-        {
-            if(i==k)
-            {
-                graph[i][k] = 0;
-            }
-
-            if(adjacency(i,k) == true)
-            {
-                graph[i][k] = (track[i].x - track[k].x) + (track[i].y - track[k].y);
-                graph[k][i] = (track[i].x - track[k].x) + (track[i].y - track[k].y); //symmtrical matrix;
-            }
-            else
-            {
-                graph[i][k] = 0;
-                graph[k][i] = 0;
-            }
-            
-        }
-    }
-}
-
-void adjacency(int i,int k)
-{
-    for(int d = 1; d<visit_length ; d++)
-    {
-        if(visit[d] == i &&(visit[d+1] == k || visit[d-1] == k))
-        {
-            return true;
         }
 
-        else
-        {
-            return false;
-        }
-        
+        leftTurn();
+        dir='L';
+
+        encoder_start=myEnc.read();
     }
+
+    else if(IR_LEFT==1 && IR_RIGHT==1 && IR_TOP==0){           //90 deg T
+
+        encoder_stop=myEnc.read();
+        assign_temp_point();
+
+        if(check()){
+            points[len].x_cordinate=temp_x;
+            points[len].y_cordinate=temp_y;
+            points[len].type=1;
+            points[len].point='A'+len;
+            points[len].explored=1;
+            len++;
+
+        }
+
+        leftTurn();
+        dir='L';
+        encoder_start=myEnc.read();
+
+    }
+
+    else if(IR_LEFT==1 && IR_RIGHT==0 && IR_TOP==1){           //left and straight
+        encoder_stop=myEnc.read();
+        assign_temp_point();
+
+        if(check()){
+            points[len].x_cordinate=temp_x;
+            points[len].y_cordinate=temp_y;
+            points[len].type=1;
+            points[len].point='A'+len;
+            points[len].explored=1;
+            len++;
+        }
+
+        leftTurn();
+
+        dir='L';
+        encoder_start=myEnc.read();
+    }
+
+    else if(IR_LEFT==1 && IR_RIGHT==0 && IR_TOP==0){           //left only
+
+        encoder_stop=myEnc.read();
+        assign_temp_point();
+
+        if(check()){
+            points[len].x_cordinate=temp_x;
+            points[len].y_cordinate=temp_y;
+            points[len].type=0;
+            points[len].point='A'+len;
+            points[len].explored=1;
+            len++;
+
+        }
+
+        leftTurn();
+        dir='L';
+        encoder_start=myEnc.read();
+
+    }
+
+    else if(IR_LEFT==0 && IR_RIGHT==1 && IR_TOP==1){           //right and straight
+
+        encoder_stop=myEnc.read();
+        assign_temp_point();
+
+        if(check()){
+            points[len].x_cordinate=temp_x;
+            points[len].y_cordinate=temp_y;
+            points[len].type=1;
+            points[len].point='A'+len;
+            points[len].explored=1;
+            len++;
+        }
+
+        straight();
+        dir='S';
+
+        encoder_start=myEnc.read();
+
+    }
+
+    else if(IR_LEFT==1 && IR_RIGHT==0 && IR_TOP==0){           //right only
+
+        encoder_stop=myEnc.read();
+        assign_temp_point();
+
+        if(check()){
+            points[len].x_cordinate=temp_x;
+            points[len].y_cordinate=temp_y;
+            points[len].type=1;
+            points[len].point='A'+len;
+            points[len].explored=1;
+            len++;
+        }
+
+        rightTurn();
+
+        dir='R';
+        encoder_start=myEnc.read();
+    }
+
+    else if(IR_LEFT==0 && IR_RIGHT==0 && IR_TOP==0){           //180
+
+        encoder_stop=myEnc.read();
+        assign_temp_point();
+
+        if(check()){
+            points[len].x_cordinate=temp_x;
+            points[len].y_cordinate=temp_y;
+            points[len].type=0;
+            points[len].point='A'+len;
+            points[len].explored=1;
+            len++;
+        }   
+
+        Back();
+
+        dir='B';
+        encoder_start=myEnc.read();
+
+    }    
+
+    else if(position)           //135 right and 90 left
+
+    else if(position<6000 && position>1000){
+
+        int motorSpeed = Kp * error + Kd * (error - lastError);
+        lastError = error;
+        int rightMotorSpeed = rightBaseSpeed + motorSpeed;
+        int leftMotorSpeed = leftBaseSpeed - motorSpeed;
+
+        if (rightMotorSpeed > rightMaxSpeed ) rightMotorSpeed = rightMaxSpeed; // prevent the motor from going beyond max speed
+
+        if (leftMotorSpeed > leftMaxSpeed ) leftMotorSpeed = leftMaxSpeed; // prevent the motor from going beyond max speed
+
+        if (rightMotorSpeed < 0) rightMotorSpeed = 0; // keep the motor speed positive
+
+        if (leftMotorSpeed < 0) leftMotorSpeed = 0; // keep the motor speed positive
+
+        {
+            digitalWrite(motorPower, HIGH); // move forward with appropriate speeds
+            digitalWrite(rightMotor1, HIGH);
+            digitalWrite(rightMotor2, LOW);
+            analogWrite(rightMotorPWM, rightMotorSpeed);
+            digitalWrite(motorPower, HIGH);
+            digitalWrite(leftMotor1, HIGH);
+            digitalWrite(leftMotor2, LOW);
+            analogWrite(leftMotorPWM, leftMotorSpeed);
+        }
+
+    }
+
+}
+
+
+
+void assign_temp_point(){
+
+    switch(dir){
+
+        case 'S':
+
+            temp_x= previous_x;
+
+            temp_y= previous_y + (encoder_stop-encoder_start);
+
+            break;
+
+        case 'L':
+
+            if(angle){
+
+                temp_x= previous_x - (encoder_stop-encoder_start);
+
+                temp_y= previous_y;
+
+            }
+
+            else{
+
+                temp_x= previous_x - 0.707*(encoder_stop-encoder_start);
+
+                temp_y= previous_y + 0.707*(encoder_stop-encoder_start);
+
+            }
+
+            break;
+
+        case 'R':
+
+            if(angle){
+
+                temp_x= previous_x + (encoder_stop-encoder_start);
+
+                temp_y= previous_y;
+
+            }
+
+            else{
+
+                temp_x= previous_x + 0.707(encoder_stop-encoder_start);
+
+                temp_y= previous_y + 0.707*(encoder_stop-encoder_start);
+
+            }
+
+            break;
+
+        case 'B':
+
+            temp_x= previous_x;
+
+            temp_y= previous_y - (encoder_stop-encoder_start);
+
+            break;
+
+
+
+    }
+
+}
+
+
+
+bool check(){
+
+    for(byte i=0;i<len;++i){
+
+        if(points[i].x_cordinate==temp_x && points[i].y_cordinate==temp_y){
+
+            points[i].explored++;
+
+            return 0;
+
+        }
+
+    }
+
+    return 1;
+
+}
+
+
+
+void wait() {
+
+  digitalWrite(motorPower, LOW);
+
+}
+
+
+
+void leftTurn(){
+
+
+
+}
+
+
+
+void rightTurn(){
+
+
+
+}
+
+
+
+void straight(){
+
+
+
+}
+
+
+
+void back(){
+
+
+
 }
