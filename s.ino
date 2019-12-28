@@ -18,6 +18,7 @@
 #define IR_LEFT A0
 #define IR_TOP 4
 #define buzzer 2
+#define ACTUALRUN 12
 
 QTRSensors qtr;
 uint16_t sensors[NUM_SENSORS];
@@ -119,9 +120,8 @@ void loop()
             move(0, 70, 0);//motor derecho hacia adelante
           }
             wait();
-            digitalWrite(buzzer,HIGH); delay(500); digitalWrite(buzzer,LOW);
             furtherRun();
-            mazeSolve();
+            mazeSolve(); 
         }
         
     path[node] = 2;
@@ -171,6 +171,9 @@ void furtherRun(){
   int runTime = 0;
   while(runTime<=node){
       qtr.readLineWhite(sensors);
+      if(digitalRead(ACTUALRUN)==1){
+        break;
+      }
       if (sensors[0] > 700 && sensors[1] > 700 && sensors[2] > 700 && sensors[3] > 700 && sensors[4] > 700 && sensors[5] > 700 && digitalRead(IR_LEFT)==1 && digitalRead(IR_RIGHT)==1) {
         wait(); delay(10); brake(); delay(50); wait();
         delay(300);
@@ -303,20 +306,25 @@ void mazeSolve() {
 
 
   digitalWrite(buzzer, HIGH); delay(1000); digitalWrite(buzzer, LOW);
-  delay(5000);
+  while(1){
+    if(digitalRead(ACTUALRUN)==1){
+      break;
+    }
+  }
   for (int j = 0; j < 2 ; j++) {
     digitalWrite(buzzer, HIGH);
-    delay(1000);
+    delay(500);
     digitalWrite(buzzer, LOW);
-    delay(1000);
+    delay(500);
   }
   
-  ////////////////////////////Actual Run//////////////////////////////
   int k = 0;
   while(1){
   if(path[k]==0){
-    while(digtalRead(IR_RIGHT)==1||DigitalRead(IR_LEFT)==1){
-      goto pid;
+    while(1){
+      if(digitalRead(IR_LEFT)==1&&digitalRead(IR_RIGHT)==1){
+        goto pid;
+      }
     }
     wait();
     break;
