@@ -314,7 +314,13 @@ void mazeSolve() {
   ////////////////////////////Actual Run//////////////////////////////
   int k = 0;
   while(1){
-  if(path[k]==0){break;}
+  if(path[k]==0){
+    while(digtalRead(IR_RIGHT)==1||DigitalRead(IR_LEFT)==1){
+      goto pid;
+    }
+    wait();
+    break;
+  }
     
   else if(path[k]==4){
     while(digitalRead(IR_LEFT)!=0){
