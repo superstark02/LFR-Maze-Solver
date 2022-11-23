@@ -16,9 +16,10 @@
 #define IR_LEFT A0
 #define IR_TOP 4
 #define buzzer 2
+#define white 150
+#define black 700
 
 QTRSensors qtr;
-uint16_t sensorValues[NUM_SENSORS];
 
 void setup()
 {
@@ -48,26 +49,50 @@ void setup()
       move(0, speedturn, 0);//motor derecho hacia adelante
     }
     qtr.calibrate();
-    delay(5);
+    delay(100);
   }
   wait();
   delay(5000); // wait for 2s to position the bot before entering the main loop 
 }  
 
 int lastError = 0;
-unsigned int sensors[6];
+unsigned int sensors[NUM_SENSORS];
 int position = qtr.readLineWhite(sensors);
+uint16_t rawValues[NUM_SENSORS];
+
 int rightMotorSpeed = 0;
 int leftMotorSpeed = 0;
 
 void loop()
 { 
+  qtr.read(rawValues);
+  //90 deg
+  if(digitalRead(IR_RIGHT)){
+    delay(2000);
+    wait();
+    if(rawValues[1] > black && rawValues[2] > black && rawValues[3] > black && rawValues[4] > black && digitalRead(IR_LEFT)){
+      while(1){
+        wait();
+      }
+    }
+    turn('r');
+  }
+  else if(digitalRead(IR_LEFT)){
+    delay(2000);
+    wait();
+    //check if forward path exists
+    if(rawValues[2] > black && rawValues[3] > black){
+      turn('l');
+    }
+  }
+  else if(rawValues[1] > black && rawValues[2] > black && rawValues[3] > black && rawValues[4] > black){
+    wait();
+    delay(1000);
+    turn('r');
+  }
+
   qtr.readLineWhite(sensors);
   position = qtr.readLineWhite(sensors);
-
-  if(position > 3000 || position < 1700){
-    turn(position);
-  } 
 
   int error = position - 2500;
   int motorSpeed = Kp * error + Kd * (error - lastError);
@@ -130,23 +155,20 @@ void move(int motor, int speed, int direction){
   }  
 }
 
-void turn(int cur_position){
-      wait();
-      digitalWrite(buzzer, HIGH);
-      delay(2000);
-      digitalWrite(buzzer, LOW);
+void turn(char direction){
+  digitalWrite(buzzer, HIGH);
 
-      if(cur_position > 3000){
-        qtr.readLineWhite(sensors);
-        while(sensors[2] < 150 && sensors[3] < 150){
-          right();
-        }
-      }
+  qtr.read(rawValues);
+  while(rawValues[2] > black && rawValues[3] > black){
+    qtr.read(rawValues);
+    if(direction == 'r'){
+      right();
+    }
+    else if(direction == 'l'){
+      left();
+    }
+    
+  }
 
-      if(cur_position < 1700){
-        qtr.readLineWhite(sensors);
-        while(sensors[2] < 150 && sensors[3] < 150){
-          left();
-        }
-      }
+  digitalWrite(buzzer, LOW);
 }
