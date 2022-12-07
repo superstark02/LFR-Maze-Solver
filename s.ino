@@ -1,9 +1,12 @@
 #include <QTRSensors.h>
-#define Kp 0.1 
-#define Kd 1 // ( Note: Kp < Kd) 
-#define MaxSpeed 250
-#define BaseSpeed 150 
-#define speedturn 100
+#define Kp 0.01 
+#define Kd 0.5 // ( Note: Kp < Kd) 
+#define AMaxSpeed 250
+#define ABaseSpeed 150 
+#define Aspeedturn 100
+#define MaxSpeed 150
+#define BaseSpeed 100 
+#define speedturn 50
 #define NUM_SENSORS  6     
 #define rightMotor1 8
 #define rightMotor2 9
@@ -16,8 +19,8 @@
 #define IR_LEFT A0
 #define IR_TOP 4
 #define buzzer 2
-#define white 150
-#define black 700
+#define white 350
+#define black 900
 
 QTRSensors qtr;
 
@@ -66,33 +69,55 @@ int leftMotorSpeed = 0;
 void loop()
 { 
   qtr.read(rawValues);
-  //90 deg
-  if(digitalRead(IR_RIGHT)){
-    delay(2000);
+  if(sensors[0] > black && sensors[1] > black && sensors[2] > black && sensors[3] > black && sensors[4] > black && sensors[5] > black){
     wait();
-    if(rawValues[1] > black && rawValues[2] > black && rawValues[3] > black && rawValues[4] > black && digitalRead(IR_LEFT)){
-      while(1){
-        wait();
-      }
-    }
-    turn('r');
-  }
-  else if(digitalRead(IR_LEFT)){
-    delay(2000);
-    wait();
-    //check if forward path exists
-    if(rawValues[2] > black && rawValues[3] > black){
-      turn('l');
-    }
-  }
-  else if(rawValues[1] > black && rawValues[2] > black && rawValues[3] > black && rawValues[4] > black){
-    wait();
+    qtr.readLineWhite(sensors);
+    apply_break();
     delay(1000);
-    turn('r');
+    qtr.readLineWhite(sensors);
+    while(sensors[2] > black && sensors[3] > black){
+      qtr.readLineWhite(sensors);
+      move(1, speedturn, 0);//motor derecho hacia adelante
+      move(0, speedturn, 1);//motor derecho hacia adelante
+    }
+    apply_break();
+    wait();
   }
 
   qtr.readLineWhite(sensors);
   position = qtr.readLineWhite(sensors);
+
+  if(digitalRead(IR_RIGHT) && !digitalRead(IR_LEFT)){
+    digitalWrite(buzzer, HIGH);
+    apply_break();
+    wait();
+    delay(1000);
+    digitalWrite(buzzer, LOW);
+    position = qtr.readLineWhite(sensors);
+    while(sensors[2] > black && sensors[3] > black){
+      position = qtr.readLineWhite(sensors);
+      move(1, speedturn, 0);//motor derecho hacia adelante
+      move(0, speedturn, 1);//motor derecho hacia adelante
+    }
+    apply_break();
+    wait();
+  }
+
+  if(!digitalRead(IR_RIGHT) && digitalRead(IR_LEFT)){
+    digitalWrite(buzzer, HIGH);
+    apply_break();
+    wait();
+    delay(1000);
+    digitalWrite(buzzer, LOW);
+    position = qtr.readLineWhite(sensors);
+    while(sensors[2] > black && sensors[3] > black){
+      position = qtr.readLineWhite(sensors);
+      move(1, speedturn, 1);//motor derecho hacia adelante
+      move(0, speedturn, 0);//motor derecho hacia adelante
+    }
+    apply_break();
+    wait();
+  }
 
   int error = position - 2500;
   int motorSpeed = Kp * error + Kd * (error - lastError);
@@ -153,6 +178,13 @@ void move(int motor, int speed, int direction){
     digitalWrite(rightMotor2, inPin2);
     analogWrite(rightMotorPWM, speed);
   }  
+}
+
+void apply_break(){
+  move(0, 100, 0);//motor derecho hacia adelante
+  move(1, 100, 0);//motor izquierdo hacia adelante
+  delay(10);
+  wait();
 }
 
 void turn(char direction){
